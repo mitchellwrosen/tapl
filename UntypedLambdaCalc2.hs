@@ -1,13 +1,15 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module UntypedLambdaCalc2 where
 
 -- | Untyped lambda calculus, using De Bruijn indices.
 
 import Data.Monoid
-import Data.Set    (Set, (\\))
-import Prelude     hiding (and, fst, not, or, snd, succ)
+import Data.Set       (Set, (\\))
+import Data.Text.Lazy (Text)
+import Prelude        hiding (and, fst, not, or, snd, succ)
 
 import qualified Data.Set                     as Set
 import qualified Text.PrettyPrint.Leijen.Text as PP
@@ -23,28 +25,48 @@ import qualified Text.PrettyPrint.Leijen.Text as PP
 
 data Term
   = Var Int
-  | Lam Term
+  | Lam Text Term
   | App Term Term
   deriving (Show)
 infixl 5 `App`
 
-instance PP.Pretty Term where
-  pretty = \case
-    Var n -> PP.int n
-    Lam t ->
-      case t of
-        Lam _ -> PP.char 'λ' PP.<> PP.pretty t
-        _     -> PP.char 'λ' PP.<+> PP.pretty t
+ppTerm :: Term -> PP.Doc
+ppTerm = go [] mempty
+ where
+  go :: [Text] -> Set Text -> Term -> PP.Doc
+  go ctx ns = \case
+    Var n -> PP.text (ix n ctx)
+    Lam n t ->
+      let
+        n' = freshify n
+      in
+        PP.char 'λ'
+          PP.<> PP.text n'
+          PP.<> PP.char '.'
+          PP.<+> go (n':ctx) (Set.insert n' ns) t
     App t1 t2 ->
-      case t1 of
-        Lam _ ->
-          case t2 of
-            Var _ -> PP.parens (PP.pretty t1) PP.<+> PP.pretty t2
-            _     -> PP.parens (PP.pretty t1) PP.<+> PP.parens (PP.pretty t2)
-        _     ->
-          case t2 of
-            Var _ -> PP.pretty t1 PP.<+> PP.pretty t2
-            _     -> PP.pretty t1 PP.<+> PP.parens (PP.pretty t2)
+      let
+        parens1 = case t1 of
+          Lam _ _ -> PP.parens
+          _       -> id
+
+        parens2 = case t2 of
+          Var _ -> PP.parens
+          _     -> id
+      in
+        parens1 (go ctx ns t1) PP.<+> parens2 (go ctx ns t2)
+
+   where
+    ix :: Int -> [Text] -> Text
+    ix _ []      = "<invalid index>"
+    ix 0 (x:_)   = x
+    ix !n (_:xs) = ix (n-1) xs
+
+    freshify :: Text -> Text
+    freshify n
+      | n `Set.member` ns = freshify (n <> "'")
+      | otherwise = n
+
 
 
 data Subst = !Int :-> Term
@@ -59,7 +81,7 @@ fvs = go 0
     Var v
       | v >= c    -> Set.singleton v
       | otherwise -> mempty
-    Lam t -> go (c+1) t
+    Lam _ t -> go (c+1) t
     App t1 t2 -> go c t1 <> go c t2
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -75,11 +97,11 @@ shift d = go 0
             !k' = k + d
           in
             Var k'
-    Lam t ->
+    Lam n t ->
       let
         !t' = go (c+1) t
       in
-        Lam t'
+        Lam n t'
     App t1 t2 ->
       let
         !t1' = go c t1
@@ -95,12 +117,12 @@ subst (x :-> s) = \case
   Var v
     | x == v    -> s
     | otherwise -> Var v
-  Lam t ->
+  Lam n t ->
     let
       !s' = shift 1 s
       !t' = subst (x+1 :-> s') t
     in
-      Lam t'
+      Lam n t'
   App t1 t2 ->
     let
       !t1' = subst (x :-> s) t1
@@ -112,9 +134,10 @@ subst (x :-> s) = \case
 eval :: Term -> Maybe Term
 eval = \case
   -- E-AppAbs
-  App (Lam t) v@(Lam _) -> pure (shift (-1) (subst (0 :-> shift 1 v) t))
+  App (Lam _ t) v@(Lam _ _) ->
+    pure (shift (-1) (subst (0 :-> shift 1 v) t))
   -- E-App2
-  App v@(Lam _) t2 -> do
+  App v@(Lam _ _) t2 -> do
     !t2' <- eval t2
     pure (App v t2')
   -- E-App1
@@ -126,87 +149,3 @@ eval = \case
 -- Big-step call-by-value evaluation
 eval' :: Term -> Term
 eval' t0 = maybe t0 eval' (eval t0)
-
-
----------------------------------------------------------------------------------
--- Some simple lambda calclus terms
-
--- tru = \\1
-tru :: Term
-tru = Lam (Lam (Var 1))
-
--- fls = \\0
-fls :: Term
-fls = Lam (Lam (Var 0))
-
--- test = \\\2 1 0
-test :: Term
-test = Lam (Lam (Lam (Var 2 `App` Var 1 `App` Var 0)))
-
--- and = \\1 0 fls
-and :: Term
-and = Lam (Lam (Var 1 `App` Var 0 `App` fls))
-
--- or = \\1 tru 0
-or :: Term
-or = Lam (Lam (Var 1 `App` tru `App` Var 0))
-
--- not = \0 fls tru
-not :: Term
-not = Lam (Var 0 `App` fls `App` tru)
-
--- pair = \\\0 2 1
-pair :: Term
-pair = Lam (Lam (Lam (Var 0 `App` Var 2 `App` Var 1)))
-
--- fst = \0 tru
-fst :: Term
-fst = Lam (Var 0 `App` tru)
-
--- snd = \0 fls
-snd :: Term
-snd = Lam (Var 0 `App` fls)
-
--- c0 = \\0
-c0 :: Term
-c0 = Lam (Lam (Var 0))
-
--- (\a. \b. \c. b (a b c)) (\s. \z. z)
--- \b. \c. b (c0 b c)
--- \b. \c. b ((\s. \z. z) b c)
---
--- \ \ 1 ((\\0) 1 0
-
--- c1 = \\1 0
-c1 :: Term
-c1 = Lam (Lam (Var 1 `App` Var 0))
-
--- c2 = \\1 (1 0)
-c2 :: Term
-c2 = Lam (Lam (Var 1 `App` (Var 1 `App` Var 0)))
-
--- succ = \\\1 (2 1 0)
-succ :: Term
-succ = Lam (Lam (Lam (Var 1 `App` (Var 2 `App` Var 1 `App` Var 0))))
-
--- plus :: \\\\3 1 (2 1 0)
-plus :: Term
-plus = Lam (Lam (Lam (Lam (Var 3 `App` Var 1 `App` (Var 2 `App` Var 1 `App` Var 0)))))
-
--- times :: \\1 (plus 0) c0
-times :: Term
-times = Lam (Lam (Var 1 `App` (plus `App` Var 0) `App` c0))
-
--- omega = (\0 0) (\0 0)
-omega :: Term
-omega = f `App` f
- where
-  f :: Term
-  f = Lam (Var 0 `App` Var 0)
-
--- fix = \(\1 (\1 1 0)) (\1 (\1 1 0))
-fix :: Term
-fix = Lam (g `App` g)
- where
-  g :: Term
-  g = Lam (Var 1 `App` Lam (Var 1 `App` Var 1 `App` Var 0))
