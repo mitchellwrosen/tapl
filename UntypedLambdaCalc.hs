@@ -54,9 +54,6 @@ instance PP.Pretty Term where
 newtype Var = V LText
   deriving (Eq, Ord, Show, IsString)
 
--- instance IsString Var where
---   fromString = V . fromString
-
 data Subst = Var :-> Term
 
 
