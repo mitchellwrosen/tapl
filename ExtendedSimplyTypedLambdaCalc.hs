@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase   #-}
 
 -- Simply typed lambda calculus extended with base types, unit, sequencing,
--- ascription, and let bindings.
+-- ascription, let bindings, and pairs.
 
 module ExtendedSimplyTypedLambdaCalc where
 
@@ -20,15 +20,20 @@ import qualified Data.Set as Set
 --       t as T             -- ascription
 --       t;t                -- sequence
 --       let x=t in t       -- let binding
+--       {t,t}              -- pair
+--       t.1                -- first projection
+--       t.2                -- second projection
 --       unit               -- constant unit
 --
 -- v ::=                    -- values:
 --       \x:T.t             -- abstraction value
+--       {v,v}              -- pair value
 --       unit               -- unit value
 --
 --
 -- T ::=                    -- types:
 --       T -> T             -- type of functions
+--       T x T              -- product type
 --       Unit               -- unit type
 --       Base               -- base type (uninterpreted)
 --
@@ -43,15 +48,20 @@ data Term
   | Asc Term Type
   | Seq Term Term
   | Let Text Term Term
+  | Pair Term Term
+  | Fst Term
+  | Snd Term
   | Unit
   deriving (Show)
 
 data Type
   = Type :-> Type
+  | Type :*  Type
   | TyUnit
   | TyBase Base
   deriving (Eq, Show)
 infixr :->
+infixr :*
 
 data Base
   = Bool
@@ -86,6 +96,19 @@ typeof c = \case
   Let _ t1 t2 -> do
     ty1 <- typeof c t1
     typeof (ty1:c) t2
+  -- T-Pair
+  Pair t1 t2 -> do
+    ty1 <- typeof c t1
+    ty2 <- typeof c t2
+    pure (ty1 :* ty2)
+  -- T-Proj1
+  Fst t -> do
+    ty :* _ <- typeof c t
+    pure ty
+  -- T-Proj2
+  Snd t -> do
+    _ :* ty <- typeof c t
+    pure ty
   Unit -> pure TyUnit
  where
   -- Safe version of (!!)
@@ -108,6 +131,9 @@ fvs = go 0
     Asc t _       -> go c t
     Seq t1 t2     -> go c t1 <> go c t2
     Let _ t1 t2   -> go c t1 <> go (c+1) t2
+    Pair t1 t2    -> go c t1 <> go c t2
+    Fst t         -> go c t
+    Snd t         -> go c t
     Unit          -> mempty
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -151,6 +177,22 @@ shift d = go 0
         !t2' = go (c+1) t2
       in
         Let n t1' t2'
+    Pair t1 t2 ->
+      let
+        !t1' = go c t1
+        !t2' = go c t2
+      in
+        Pair t1' t2'
+    Fst t ->
+      let
+        !t' = go c t
+      in
+        Fst t'
+    Snd t ->
+      let
+        !t' = go c t
+      in
+        Snd t'
     Unit -> Unit
 
 
@@ -192,6 +234,22 @@ subst s0@(Subst x s) = \case
       !t2' = subst (Subst (x+1) s') t2
     in
       Let n t1' t2'
+  Pair t1 t2 ->
+    let
+      !t1' = subst s0 t1
+      !t2' = subst s0 t2
+    in
+      Pair t1' t2'
+  Fst t ->
+    let
+      !t' = subst s0 t
+    in
+      Fst t'
+  Snd t ->
+    let
+      !t' = subst s0 t
+    in
+      Snd t'
   Unit -> Unit
 
 
@@ -229,14 +287,37 @@ eval = \case
   Let n t1 t2 -> do
     !t1' <- eval t1
     pure (Let n t1' t2)
-
+  -- E-PairBeta1
+  Fst v@(Pair v1 _) | isval v ->
+    pure v1
+  -- E-PairBeta2
+  Snd v@(Pair _ v2) | isval v ->
+    pure v2
+  -- E-Proj1
+  Fst t -> do
+    t' <- eval t
+    pure (Fst t')
+  -- E-Proj2
+  Snd t -> do
+    t' <- eval t
+    pure (Snd t')
+  Pair t1 t2
+    -- E-Pair2
+    | isval t1 -> do
+        t2' <- eval t2
+        pure (Pair t1 t2')
+    -- E-Pair1
+    | otherwise -> do
+        t1' <- eval t1
+        pure (Pair t1' t2)
   _ -> Nothing
  where
   isval :: Term -> Bool
   isval = \case
-    Lam _ _ _ -> True
-    Unit      -> True
-    _         -> False
+    Lam _ _ _  -> True
+    Pair t1 t2 -> isval t1 && isval t2
+    Unit       -> True
+    _          -> False
 
   -- @beta s t@ subtitutes s for variable 0 in t.
   beta :: Term -> Term -> Term
