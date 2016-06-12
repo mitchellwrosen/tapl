@@ -8,7 +8,7 @@ module ExtendedSimplyTypedLambdaCalc where
 
 import Control.Monad  (guard)
 import Data.Monoid
-import Data.Set       (Set, (\\))
+import Data.Set       (Set)
 import Data.Text.Lazy (Text)
 
 import qualified Data.Set as Set
@@ -105,7 +105,9 @@ fvs = go 0
       | otherwise -> mempty
     Lam _ _ t     -> go (c+1) t
     App t1 t2     -> go c t1 <> go c t2
+    Asc t _       -> go c t
     Seq t1 t2     -> go c t1 <> go c t2
+    Let _ t1 t2   -> go c t1 <> go (c+1) t2
     Unit          -> mempty
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -126,14 +128,37 @@ shift d = go 0
         !t' = go (c+1) t
       in
         Lam n ty t'
-    t -> tmap (go c) t
+    App t1 t2 ->
+      let
+        !t1' = go c t1
+        !t2' = go c t2
+      in
+        App t1' t2'
+    Asc t ty ->
+      let
+        !t' = go c t
+      in
+        Asc t' ty
+    Seq t1 t2 ->
+      let
+        !t1' = go c t1
+        !t2' = go c t2
+      in
+        Seq t1' t2'
+    Let n t1 t2 ->
+      let
+        !t1' = go c t1
+        !t2' = go (c+1) t2
+      in
+        Let n t1' t2'
+    Unit -> Unit
 
 
 -- @subst x s t@ substitutes all free occurrences of @x@ in @t@ with @s@.
 --
 -- [x -> s]t
 subst :: Subst -> Term -> Term
-subst (Subst x s) = \case
+subst s0@(Subst x s) = \case
   Var v
     | x == v    -> s
     | otherwise -> Var v
@@ -143,7 +168,32 @@ subst (Subst x s) = \case
       !t' = subst (Subst (x+1) s') t
     in
       Lam n ty t'
-  t -> tmap (subst (Subst x s)) t
+  App t1 t2 ->
+    let
+      !t1' = subst s0 t1
+      !t2' = subst s0 t2
+    in
+      App t1' t2'
+  Asc t ty ->
+    let
+      !t' = subst s0 t
+    in
+      Asc t' ty
+  Seq t1 t2 ->
+    let
+      !t1' = subst s0 t1
+      !t2' = subst s0 t2
+    in
+      Seq t1' t2'
+  Let n t1 t2 ->
+    let
+      !t1' = subst s0 t1
+      !s'  = shift 1 s
+      !t2' = subst (Subst (x+1) s') t2
+    in
+      Let n t1' t2'
+  Unit -> Unit
+
 
 -- Small-step call-by-value evaluation
 eval :: Term -> Maybe Term
@@ -195,13 +245,3 @@ eval = \case
 -- Big-step call-by-value evaluation
 eval' :: Term -> Term
 eval' t0 = maybe t0 eval' (eval t0)
-
-tmap :: (Term -> Term) -> Term -> Term
-tmap f = \case
-  Var x       -> Var x
-  Lam n ty t  -> Lam n ty (f $! t)
-  App t1 t2   -> App (f $! t1) (f $! t2)
-  Asc t ty    -> Asc (f $! t) ty
-  Seq t1 t2   -> Seq (f $! t1) (f $! t2)
-  Unit        -> Unit
-
