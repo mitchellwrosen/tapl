@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase   #-}
 
 -- Simply typed lambda calculus extended with base types, unit, sequencing,
--- ascription, let bindings, and pairs.
+-- ascription, let bindings, and tuples.
 
 module ExtendedSimplyTypedLambdaCalc where
 
@@ -20,20 +20,19 @@ import qualified Data.Set as Set
 --       t as T             -- ascription
 --       t;t                -- sequence
 --       let x=t in t       -- let binding
---       {t,t}              -- pair
---       t.1                -- first projection
---       t.2                -- second projection
+--       {t,...}            -- tuple
+--       t.i                -- projection
 --       unit               -- constant unit
 --
 -- v ::=                    -- values:
 --       \x:T.t             -- abstraction value
---       {v,v}              -- pair value
+--       {v,...}            -- tuple value
 --       unit               -- unit value
 --
 --
 -- T ::=                    -- types:
 --       T -> T             -- type of functions
---       T x T              -- product type
+--       {T,...}            -- tuple type
 --       Unit               -- unit type
 --       Base               -- base type (uninterpreted)
 --
@@ -48,20 +47,18 @@ data Term
   | Asc Term Type
   | Seq Term Term
   | Let Text Term Term
-  | Pair Term Term
-  | Fst Term
-  | Snd Term
+  | Tuple [Term]
+  | Prj Term Int
   | Unit
   deriving (Show)
 
 data Type
   = Type :-> Type
-  | Type :*  Type
+  | TyTuple [Type]
   | TyUnit
   | TyBase Base
   deriving (Eq, Show)
 infixr :->
-infixr :*
 
 data Base
   = Bool
@@ -75,7 +72,7 @@ type Ctx = [Type]
 typeof :: Ctx -> Term -> Maybe Type
 typeof c = \case
   -- T-Var
-  Var n -> ix n c
+  Var n -> pure (c !! n)
   -- T-Abs
   Lam _ ty1 t -> do
     ty2 <- typeof (ty1:c) t
@@ -96,26 +93,15 @@ typeof c = \case
   Let _ t1 t2 -> do
     ty1 <- typeof c t1
     typeof (ty1:c) t2
-  -- T-Pair
-  Pair t1 t2 -> do
-    ty1 <- typeof c t1
-    ty2 <- typeof c t2
-    pure (ty1 :* ty2)
-  -- T-Proj1
-  Fst t -> do
-    ty :* _ <- typeof c t
-    pure ty
-  -- T-Proj2
-  Snd t -> do
-    _ :* ty <- typeof c t
-    pure ty
+  -- T-Tuple
+  Tuple ts -> do
+    tys <- mapM (typeof c) ts
+    pure (TyTuple tys)
+  -- T-Proj
+  Prj t n -> do
+    TyTuple ts <- typeof c t
+    pure (ts !! n)
   Unit -> pure TyUnit
- where
-  -- Safe version of (!!)
-  ix :: Int -> [a] -> Maybe a
-  ix _  []     = Nothing
-  ix 0  (x:_)  = Just x
-  ix !n (_:xs) = ix (n-1) xs
 
 -- @fvs t@ finds all free variables in @t@.
 fvs :: Term -> Set Int
@@ -131,9 +117,8 @@ fvs = go 0
     Asc t _       -> go c t
     Seq t1 t2     -> go c t1 <> go c t2
     Let _ t1 t2   -> go c t1 <> go (c+1) t2
-    Pair t1 t2    -> go c t1 <> go c t2
-    Fst t         -> go c t
-    Snd t         -> go c t
+    Tuple ts      -> foldMap (go c) ts
+    Prj t _       -> go c t
     Unit          -> mempty
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -144,57 +129,15 @@ shift d = go 0
   go !c = \case
     Var k
       | k < c     -> Var k
-      | otherwise ->
-          let
-            !k' = k + d
-          in
-            Var k'
-    Lam n ty t ->
-      let
-        !t' = go (c+1) t
-      in
-        Lam n ty t'
-    App t1 t2 ->
-      let
-        !t1' = go c t1
-        !t2' = go c t2
-      in
-        App t1' t2'
-    Asc t ty ->
-      let
-        !t' = go c t
-      in
-        Asc t' ty
-    Seq t1 t2 ->
-      let
-        !t1' = go c t1
-        !t2' = go c t2
-      in
-        Seq t1' t2'
-    Let n t1 t2 ->
-      let
-        !t1' = go c t1
-        !t2' = go (c+1) t2
-      in
-        Let n t1' t2'
-    Pair t1 t2 ->
-      let
-        !t1' = go c t1
-        !t2' = go c t2
-      in
-        Pair t1' t2'
-    Fst t ->
-      let
-        !t' = go c t
-      in
-        Fst t'
-    Snd t ->
-      let
-        !t' = go c t
-      in
-        Snd t'
-    Unit -> Unit
-
+      | otherwise -> Var (k+d)
+    Lam n ty t    -> Lam n ty (go (c+1) t)
+    App t1 t2     -> App (go c t1) (go c t2)
+    Asc t ty      -> Asc (go c t) ty
+    Seq t1 t2     -> Seq (go c t1) (go c t2)
+    Let n t1 t2   -> Let n (go c t1) (go (c+1) t2)
+    Tuple ts      -> Tuple (map (go c) ts)
+    Prj t n       -> Prj (go c t) n
+    Unit          -> Unit
 
 -- @subst x s t@ substitutes all free occurrences of @x@ in @t@ with @s@.
 --
@@ -204,54 +147,18 @@ subst s0@(Subst x s) = \case
   Var v
     | x == v    -> s
     | otherwise -> Var v
-  Lam n ty t ->
-    let
-      !s' = shift 1 s
-      !t' = subst (Subst (x+1) s') t
-    in
-      Lam n ty t'
-  App t1 t2 ->
-    let
-      !t1' = subst s0 t1
-      !t2' = subst s0 t2
-    in
-      App t1' t2'
-  Asc t ty ->
-    let
-      !t' = subst s0 t
-    in
-      Asc t' ty
-  Seq t1 t2 ->
-    let
-      !t1' = subst s0 t1
-      !t2' = subst s0 t2
-    in
-      Seq t1' t2'
-  Let n t1 t2 ->
-    let
-      !t1' = subst s0 t1
-      !s'  = shift 1 s
-      !t2' = subst (Subst (x+1) s') t2
-    in
-      Let n t1' t2'
-  Pair t1 t2 ->
-    let
-      !t1' = subst s0 t1
-      !t2' = subst s0 t2
-    in
-      Pair t1' t2'
-  Fst t ->
-    let
-      !t' = subst s0 t
-    in
-      Fst t'
-  Snd t ->
-    let
-      !t' = subst s0 t
-    in
-      Snd t'
-  Unit -> Unit
-
+  Lam n ty t    -> Lam n ty (under t)
+  App t1 t2     -> App (subst s0 t1) (subst s0 t2)
+  Asc t ty      -> Asc (subst s0 t) ty
+  Seq t1 t2     -> Seq (subst s0 t1) (subst s0 t2)
+  Let n t1 t2   -> Let n (subst s0 t1) (under t2)
+  Tuple ts      -> Tuple (map (subst s0) ts)
+  Prj t n       -> Prj (subst s0 t) n
+  Unit          -> Unit
+ where
+  -- Shift under a lambda
+  under :: Term -> Term
+  under = subst (Subst (x+1) (shift 1 s))
 
 -- Small-step call-by-value evaluation
 eval :: Term -> Maybe Term
@@ -261,61 +168,49 @@ eval = \case
     pure (beta v t)
   -- E-App2
   App v@(Lam _ _ _) t2 -> do
-    !t2' <- eval t2
+    t2' <- eval t2
     pure (App v t2')
   -- E-App1
   App t1 t2 -> do
-    !t1' <- eval t1
+    t1' <- eval t1
     pure (App t1' t2)
   -- E-Ascribe
   Asc v _ | isval v ->
     pure v
   -- E-Ascribe1
   Asc t ty -> do
-    !t' <- eval t
+    t' <- eval t
     pure (Asc t' ty)
   -- E-SeqNext
   Seq Unit t2 ->
     pure t2
   Seq t1 t2 -> do
-    !t1' <- eval t1
+    t1' <- eval t1
     pure (Seq t1' t2)
   -- E-LetV
   Let _ v t | isval v ->
     pure (beta v t)
   -- E-Let
   Let n t1 t2 -> do
-    !t1' <- eval t1
+    t1' <- eval t1
     pure (Let n t1' t2)
-  -- E-PairBeta1
-  Fst v@(Pair v1 _) | isval v ->
-    pure v1
-  -- E-PairBeta2
-  Snd v@(Pair _ v2) | isval v ->
-    pure v2
-  -- E-Proj1
-  Fst t -> do
+  -- E-ProjTuple
+  Prj (Tuple ts) n | all isval ts ->
+    pure (ts !! n)
+  -- E-Proj
+  Prj t n -> do
     t' <- eval t
-    pure (Fst t')
-  -- E-Proj2
-  Snd t -> do
+    pure (Prj t' n)
+  -- E-Tuple
+  Tuple ts0 | (vs,t:ts) <- span isval ts0 -> do
     t' <- eval t
-    pure (Snd t')
-  Pair t1 t2
-    -- E-Pair2
-    | isval t1 -> do
-        t2' <- eval t2
-        pure (Pair t1 t2')
-    -- E-Pair1
-    | otherwise -> do
-        t1' <- eval t1
-        pure (Pair t1' t2)
+    pure (Tuple (vs ++ [t'] ++ ts))
   _ -> Nothing
  where
   isval :: Term -> Bool
   isval = \case
     Lam _ _ _  -> True
-    Pair t1 t2 -> isval t1 && isval t2
+    Tuple ts   -> all isval ts
     Unit       -> True
     _          -> False
 
