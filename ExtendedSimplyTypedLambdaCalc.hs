@@ -21,18 +21,22 @@ import qualified Data.Set as Set
 --       t;t                -- sequence
 --       let x=t in t       -- let binding
 --       {t,...}            -- tuple
---       t.i                -- projection
+--       t.i                -- tuple projection
+--       {l=t,...}          -- record
+--       t.l                -- record projection
 --       unit               -- constant unit
 --
 -- v ::=                    -- values:
 --       \x:T.t             -- abstraction value
 --       {v,...}            -- tuple value
+--       {l=v,...}          -- record value
 --       unit               -- unit value
 --
 --
 -- T ::=                    -- types:
 --       T -> T             -- type of functions
---       {T,...}            -- tuple type
+--       {T,...}            -- type of tuples
+--       {l:T,...}          -- type of records
 --       Unit               -- unit type
 --       Base               -- base type (uninterpreted)
 --
@@ -42,19 +46,27 @@ import qualified Data.Set as Set
 
 data Term
   = Var Int
-  | Lam Text Type Term
+  | Lam Hint Type Term
   | App Term Term
   | Asc Term Type
   | Seq Term Term
-  | Let Text Term Term
+  | Let Hint Term Term
   | Tuple [Term]
-  | Prj Term Int
+  | PrjT Term Int
+  | Record [(Label,Term)]
+  | PrjR Term Label
   | Unit
   deriving (Show)
+
+-- A hint about what to name the bound variable when pretty printing
+type Hint = Text
+
+type Label = Text
 
 data Type
   = Type :-> Type
   | TyTuple [Type]
+  | TyRecord [(Label,Type)]
   | TyUnit
   | TyBase Base
   deriving (Eq, Show)
@@ -71,13 +83,10 @@ type Ctx = [Type]
 
 typeof :: Ctx -> Term -> Maybe Type
 typeof c = \case
-  -- T-Var
   Var n -> pure (c !! n)
-  -- T-Abs
   Lam _ ty1 t -> do
     ty2 <- typeof (ty1:c) t
     pure (ty1 :-> ty2)
-  -- T-App
   App t1 t2 -> do
     ty1 :-> ty2 <- typeof c t1
     ty1'        <- typeof c t2
@@ -93,14 +102,19 @@ typeof c = \case
   Let _ t1 t2 -> do
     ty1 <- typeof c t1
     typeof (ty1:c) t2
-  -- T-Tuple
   Tuple ts -> do
     tys <- mapM (typeof c) ts
     pure (TyTuple tys)
-  -- T-Proj
-  Prj t n -> do
+  PrjT t n -> do
     TyTuple ts <- typeof c t
     pure (ts !! n)
+  Record ts0 -> do
+    let (ls,ts) = unzip ts0
+    tys <- mapM (typeof c) ts
+    pure (TyRecord (zip ls tys))
+  PrjR t l -> do
+    TyRecord ts0 <- typeof c t
+    lookup l ts0
   Unit -> pure TyUnit
 
 -- @fvs t@ finds all free variables in @t@.
@@ -118,7 +132,9 @@ fvs = go 0
     Seq t1 t2     -> go c t1 <> go c t2
     Let _ t1 t2   -> go c t1 <> go (c+1) t2
     Tuple ts      -> foldMap (go c) ts
-    Prj t _       -> go c t
+    PrjT t _      -> go c t
+    Record ts     -> foldMap (go c . snd) ts
+    PrjR t _      -> go c t
     Unit          -> mempty
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -136,7 +152,11 @@ shift d = go 0
     Seq t1 t2     -> Seq (go c t1) (go c t2)
     Let n t1 t2   -> Let n (go c t1) (go (c+1) t2)
     Tuple ts      -> Tuple (map (go c) ts)
-    Prj t n       -> Prj (go c t) n
+    PrjT t n      -> PrjT (go c t) n
+    Record ts0    -> Record (zip ls (map (go c) ts))
+     where
+      (ls,ts) = unzip ts0
+    PrjR t l      -> PrjR (go c t) l
     Unit          -> Unit
 
 -- @subst x s t@ substitutes all free occurrences of @x@ in @t@ with @s@.
@@ -153,7 +173,11 @@ subst s0@(Subst x s) = \case
   Seq t1 t2     -> Seq (subst s0 t1) (subst s0 t2)
   Let n t1 t2   -> Let n (subst s0 t1) (under t2)
   Tuple ts      -> Tuple (map (subst s0) ts)
-  Prj t n       -> Prj (subst s0 t) n
+  PrjT t n      -> PrjT (subst s0 t) n
+  Record ts0    -> Record (zip ls (map (subst s0) ts))
+   where
+    (ls,ts) = unzip ts0
+  PrjR t l      -> PrjR (subst s0 t) l
   Unit          -> Unit
  where
   -- Shift under a lambda
@@ -163,49 +187,63 @@ subst s0@(Subst x s) = \case
 -- Small-step call-by-value evaluation
 eval :: Term -> Maybe Term
 eval = \case
-  -- E-AppAbs
+  Var _ -> Nothing
+
+  Lam _ _ _ -> Nothing
+
   App (Lam _ _ t) v | isval v ->
     pure (beta v t)
-  -- E-App2
   App v@(Lam _ _ _) t2 -> do
     t2' <- eval t2
     pure (App v t2')
-  -- E-App1
   App t1 t2 -> do
     t1' <- eval t1
     pure (App t1' t2)
-  -- E-Ascribe
+
   Asc v _ | isval v ->
     pure v
-  -- E-Ascribe1
   Asc t ty -> do
     t' <- eval t
     pure (Asc t' ty)
-  -- E-SeqNext
+
   Seq Unit t2 ->
     pure t2
   Seq t1 t2 -> do
     t1' <- eval t1
     pure (Seq t1' t2)
-  -- E-LetV
+
   Let _ v t | isval v ->
     pure (beta v t)
-  -- E-Let
   Let n t1 t2 -> do
     t1' <- eval t1
     pure (Let n t1' t2)
-  -- E-ProjTuple
-  Prj (Tuple ts) n | all isval ts ->
-    pure (ts !! n)
-  -- E-Proj
-  Prj t n -> do
-    t' <- eval t
-    pure (Prj t' n)
-  -- E-Tuple
+
   Tuple ts0 | (vs,t:ts) <- span isval ts0 -> do
     t' <- eval t
     pure (Tuple (vs ++ [t'] ++ ts))
-  _ -> Nothing
+  Tuple _ -> Nothing
+
+  PrjT (Tuple ts) n | all isval ts ->
+    pure (ts !! n)
+  PrjT t n -> do
+    t' <- eval t
+    pure (PrjT t' n)
+
+  PrjR (Record ts) l | all (isval . snd) ts ->
+    lookup l ts
+  PrjR t l -> do
+    t' <- eval t
+    pure (PrjR t' l)
+
+  Record ts0 -> do
+    let (ls,ts) = unzip ts0
+    case span isval ts of
+      (vs,t:tss) -> do
+        t' <- eval t
+        pure (Record (zip ls (vs ++ [t'] ++ tss)))
+      _ -> Nothing
+
+  Unit -> Nothing
  where
   isval :: Term -> Bool
   isval = \case
