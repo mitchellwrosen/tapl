@@ -2,11 +2,13 @@
 {-# LANGUAGE LambdaCase   #-}
 
 -- Simply typed lambda calculus extended with base types, unit, sequencing,
--- ascription, let bindings, and tuples.
+-- ascription, let bindings, tuples, and variants.
 
 module ExtendedSimplyTypedLambdaCalc where
 
-import Control.Monad  (guard)
+import Utils
+
+import Control.Monad  (forM, guard)
 import Data.Monoid
 import Data.Set       (Set)
 import Data.Text.Lazy (Text)
@@ -24,12 +26,15 @@ import qualified Data.Set as Set
 --       t.i                -- tuple projection
 --       {l=t,...}          -- record
 --       t.l                -- record projection
+--       <l=t> as T         -- tagging
+--       case t of <l=x>=>t -- case
 --       unit               -- constant unit
 --
 -- v ::=                    -- values:
 --       \x:T.t             -- abstraction value
 --       {v,...}            -- tuple value
 --       {l=v,...}          -- record value
+--       <l=v> as T         -- variant value
 --       unit               -- unit value
 --
 --
@@ -37,6 +42,7 @@ import qualified Data.Set as Set
 --       T -> T             -- type of functions
 --       {T,...}            -- type of tuples
 --       {l:T,...}          -- type of records
+--       <l:T...>           -- type of variants
 --       Unit               -- unit type
 --       Base               -- base type (uninterpreted)
 --
@@ -55,6 +61,8 @@ data Term
   | PrjT Term Int
   | Record [(Label,Term)]
   | PrjR Term Label
+  | Inj Label Term Type
+  | Case Term [(Label,Hint,Term)]
   | Unit
   deriving (Show)
 
@@ -67,6 +75,7 @@ data Type
   = Type :-> Type
   | TyTuple [Type]
   | TyRecord [(Label,Type)]
+  | TyVariant [(Label,Type)]
   | TyUnit
   | TyBase Base
   deriving (Eq, Show)
@@ -115,7 +124,28 @@ typeof c = \case
   PrjR t l -> do
     TyRecord ts0 <- typeof c t
     lookup l ts0
+  Inj l t (TyVariant tys) -> do
+    ty  <- typeof c t
+    ty' <- lookup l tys
+    guard (ty == ty')
+    pure (TyVariant tys)
+  Case t bs -> do
+    TyVariant tys0 <- typeof c t
+    tys <- forM tys0 (\(li,tyi) -> do
+      (_,ti) <- lookup2 li bs
+      typeof (tyi:c) ti)
+    alleq tys
   Unit -> pure TyUnit
+  _ -> Nothing
+ where
+  alleq :: Eq a => [a] -> Maybe a
+  alleq []     = Nothing
+  alleq (a:as) = go as
+   where
+    go [] = Just a
+    go (b:bs)
+      | a == b    = go bs
+      | otherwise = Nothing
 
 -- @fvs t@ finds all free variables in @t@.
 fvs :: Term -> Set Int
@@ -135,6 +165,8 @@ fvs = go 0
     PrjT t _      -> go c t
     Record ts     -> foldMap (go c . snd) ts
     PrjR t _      -> go c t
+    Inj _ t _     -> go c t
+    Case t bs     -> go c t <> foldMap (\(_,_,ti) -> go (c+1) ti) bs
     Unit          -> mempty
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -153,10 +185,10 @@ shift d = go 0
     Let n t1 t2   -> Let n (go c t1) (go (c+1) t2)
     Tuple ts      -> Tuple (map (go c) ts)
     PrjT t n      -> PrjT (go c t) n
-    Record ts0    -> Record (zip ls (map (go c) ts))
-     where
-      (ls,ts) = unzip ts0
+    Record ts     -> Record (over (traverse._2) (go c) ts)
     PrjR t l      -> PrjR (go c t) l
+    Inj l t ty    -> Inj l (go c t) ty
+    Case t bs     -> Case (go c t) (over (traverse._3) (go (c+1)) bs)
     Unit          -> Unit
 
 -- @subst x s t@ substitutes all free occurrences of @x@ in @t@ with @s@.
@@ -174,13 +206,14 @@ subst s0@(Subst x s) = \case
   Let n t1 t2   -> Let n (subst s0 t1) (under t2)
   Tuple ts      -> Tuple (map (subst s0) ts)
   PrjT t n      -> PrjT (subst s0 t) n
-  Record ts0    -> Record (zip ls (map (subst s0) ts))
-   where
-    (ls,ts) = unzip ts0
+  Record ts     -> Record (over (traverse._2) (subst s0) ts)
   PrjR t l      -> PrjR (subst s0 t) l
+  Inj l t ty    -> Inj l (subst s0 t) ty
+  Case t bs     -> Case (subst s0 t) (over (traverse._3) under bs)
   Unit          -> Unit
  where
-  -- Shift under a lambda
+  -- Substitute under a lambda: shift the inner term and apply the substitution
+  -- on the shifted index instead.
   under :: Term -> Term
   under = subst (Subst (x+1) (shift 1 s))
 
@@ -243,6 +276,19 @@ eval = \case
         pure (Record (zip ls (vs ++ [t'] ++ tss)))
       _ -> Nothing
 
+  -- FIXME: Do I need a "| not (isval t)" guard?
+  Inj l t ty -> do
+    t' <- eval t
+    pure (Inj l t' ty)
+
+  Case (Inj l v _) bs | isval v -> do
+    (_,t) <- lookup2 l bs
+    pure (beta v t)
+
+  Case t bs -> do
+    t' <- eval t
+    pure (Case t' bs)
+
   Unit -> Nothing
  where
   isval :: Term -> Bool
@@ -259,3 +305,11 @@ eval = \case
 -- Big-step call-by-value evaluation
 eval' :: Term -> Term
 eval' t0 = maybe t0 eval' (eval t0)
+
+--------------------------------------------------------------------------------
+
+lookup2 :: Eq a => a -> [(a,b,c)] -> Maybe (b,c)
+lookup2 _ [] = Nothing
+lookup2 a ((a',b,d):xs)
+  | a == a'   = Just (b,d)
+  | otherwise = lookup2 a xs
