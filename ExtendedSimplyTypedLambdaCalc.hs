@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase   #-}
 
 -- Simply typed lambda calculus extended with base types, unit, sequencing,
--- ascription, let bindings, tuples, and variants.
+-- ascription, let bindings, tuples, variants, and fixpoint.
 
 module ExtendedSimplyTypedLambdaCalc where
 
@@ -28,6 +28,7 @@ import qualified Data.Set as Set
 --       t.l                -- record projection
 --       <l=t> as T         -- tagging
 --       case t of <l=x>=>t -- case
+--       fix t              -- fixed point of t
 --       unit               -- constant unit
 --
 -- v ::=                    -- values:
@@ -63,6 +64,7 @@ data Term
   | PrjR Term Label
   | Inj Label Term Type
   | Case Term [(Label,Hint,Term)]
+  | Fix Term
   | Unit
   deriving (Show)
 
@@ -93,50 +95,69 @@ type Ctx = [Type]
 typeof :: Ctx -> Term -> Maybe Type
 typeof c = \case
   Var n -> pure (c !! n)
+
   Lam _ ty1 t -> do
     ty2 <- typeof (ty1:c) t
     pure (ty1 :-> ty2)
+
   App t1 t2 -> do
     ty1 :-> ty2 <- typeof c t1
     ty1'        <- typeof c t2
     guard (ty1 == ty1')
     pure ty2
+
   Asc t ty -> do
     ty' <- typeof c t
     guard (ty == ty')
     pure ty
+
   Seq t1 t2 -> do
     TyUnit <- typeof c t1
     typeof c t2
+
   Let _ t1 t2 -> do
     ty1 <- typeof c t1
     typeof (ty1:c) t2
+
   Tuple ts -> do
     tys <- mapM (typeof c) ts
     pure (TyTuple tys)
+
   PrjT t n -> do
     TyTuple ts <- typeof c t
     pure (ts !! n)
+
   Record ts0 -> do
     let (ls,ts) = unzip ts0
     tys <- mapM (typeof c) ts
     pure (TyRecord (zip ls tys))
+
   PrjR t l -> do
     TyRecord ts0 <- typeof c t
     lookup l ts0
+
   Inj l t (TyVariant tys) -> do
     ty  <- typeof c t
     ty' <- lookup l tys
     guard (ty == ty')
     pure (TyVariant tys)
+  Inj _ _ _ -> Nothing
+
   Case t bs -> do
     TyVariant tys0 <- typeof c t
     tys <- forM tys0 (\(li,tyi) -> do
       (_,ti) <- lookup2 li bs
       typeof (tyi:c) ti)
     alleq tys
+
+  Fix t -> do
+    ty1 :-> ty2 <- typeof c t
+    guard (ty1 == ty2)
+    pure ty1
+
   Unit -> pure TyUnit
-  _ -> Nothing
+
+  -- _ -> Nothing
  where
   alleq :: Eq a => [a] -> Maybe a
   alleq []     = Nothing
@@ -167,6 +188,7 @@ fvs = go 0
     PrjR t _      -> go c t
     Inj _ t _     -> go c t
     Case t bs     -> go c t <> foldMap (\(_,_,ti) -> go (c+1) ti) bs
+    Fix t         -> go c t
     Unit          -> mempty
 
 -- @shift d t@ shifts all free variables in @t@ by @d@.
@@ -189,6 +211,7 @@ shift d = go 0
     PrjR t l      -> PrjR (go c t) l
     Inj l t ty    -> Inj l (go c t) ty
     Case t bs     -> Case (go c t) (over (traverse._3) (go (c+1)) bs)
+    Fix t         -> Fix (go c t)
     Unit          -> Unit
 
 -- @subst x s t@ substitutes all free occurrences of @x@ in @t@ with @s@.
@@ -210,6 +233,7 @@ subst s0@(Subst x s) = \case
   PrjR t l      -> PrjR (subst s0 t) l
   Inj l t ty    -> Inj l (subst s0 t) ty
   Case t bs     -> Case (subst s0 t) (over (traverse._3) under bs)
+  Fix t         -> Fix (subst s0 t)
   Unit          -> Unit
  where
   -- Substitute under a lambda: shift the inner term and apply the substitution
@@ -284,10 +308,15 @@ eval = \case
   Case (Inj l v _) bs | isval v -> do
     (_,t) <- lookup2 l bs
     pure (beta v t)
-
   Case t bs -> do
     t' <- eval t
     pure (Case t' bs)
+
+  t0@(Fix (Lam _ _ t)) ->
+    pure (subst (Subst 0 t0) t)
+  Fix t -> do
+    t' <- eval t
+    pure (Fix t')
 
   Unit -> Nothing
  where
