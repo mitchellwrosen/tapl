@@ -1,0 +1,15 @@
+name: untyped-lambda-calc
+
+build-tools:
+  - alex
+  - happy
+
+library:
+  source-dirs: src
+  dependencies:
+    - array
+    - base
+    - bound
+  other-modules:
+    - GenLexer
+    - GenParser
