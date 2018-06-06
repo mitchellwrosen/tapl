@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -e
+
+ghcid -c 'cabal new-repl' --restart tapl.cabal

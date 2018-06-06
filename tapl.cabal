@@ -1,0 +1,10 @@
+cabal-version: 2.2
+name: tapl
+version: 0
+
+library
+  build-depends: base, lexer-applicative, parsec, regex-applicative, srcloc
+  default-extensions:
+    LambdaCase, OverloadedStrings, PatternSynonyms, ViewPatterns
+  ghc-options: -Wall
+  exposed-modules: UntypedExpr
