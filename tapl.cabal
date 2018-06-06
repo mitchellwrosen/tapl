@@ -3,8 +3,10 @@ name: tapl
 version: 0
 
 library
-  build-depends: base, lexer-applicative, parsec, regex-applicative, srcloc
+  build-depends:
+    base, containers, lexer-applicative, megaparsec, parsec, regex-applicative,
+    srcloc
   default-extensions:
     LambdaCase, OverloadedStrings, PatternSynonyms, ViewPatterns
   ghc-options: -Wall
-  exposed-modules: UntypedExpr
+  exposed-modules: UntypedExpr, UntypedLambdaCalc
