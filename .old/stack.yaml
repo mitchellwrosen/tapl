@@ -1,3 +1,0 @@
-resolver: lts-6.5
-packages:
-  - untyped-lambda-calc
