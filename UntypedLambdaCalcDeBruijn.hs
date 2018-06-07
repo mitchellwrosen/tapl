@@ -60,15 +60,19 @@ evalString =
 
 -- | @subst x t s@ substitutes occurrences of @x@ in @s@ to @t@.
 subst :: Var -> Term -> Term -> Term
-subst x t = \case
-  Var y ->
-    if x == y
-      then t
-      else Var y
-  Lam s ->
-    Lam (subst (x+1) (shift 1 t) s)
-  App t1 t2 ->
-    App (subst x t t1) (subst x t t2)
+subst x =
+  go 0
+ where
+  go :: Int -> Term -> Term -> Term
+  go c t = \case
+    Var y ->
+      if x+c == y
+        then shift c t
+        else Var y
+    Lam s ->
+      Lam (go (c+1) t s)
+    App t1 t2 ->
+      App (go c t t1) (go c t t2)
 
 -- | @shift d t@ shifts all variables by @d@.
 shift :: Int -> Term -> Term
