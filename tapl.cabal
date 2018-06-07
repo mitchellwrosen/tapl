@@ -4,9 +4,24 @@ version: 0
 
 library
   build-depends:
-    base, containers, lexer-applicative, megaparsec, parsec, regex-applicative,
-    srcloc
+      base ^>= 4.11
+    , containers ^>= 0.5
+    , lexer-applicative ^>= 2.1.0.2
+    , megaparsec ^>= 6.5.0
+    , mtl ^>= 2.2
+    , parsec ^>= 3.1
+    , regex-applicative ^>= 0.3
+    , srcloc >= 0.5
   default-extensions:
-    LambdaCase, OverloadedStrings, PatternSynonyms, ViewPatterns
-  ghc-options: -Wall
-  exposed-modules: UntypedExpr, UntypedLambdaCalc
+    LambdaCase, OverloadedStrings, PatternSynonyms, ScopedTypeVariables,
+    ViewPatterns
+  default-language:
+    Haskell2010
+  ghc-options:
+    -fprint-expanded-synonyms -fprint-explicit-foralls -fprint-explicit-kinds
+    -fprint-unicode-syntax -freverse-errors -Wall -Wcompat -Widentities
+    -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists
+    -Wmissing-local-signatures -Wnoncanonical-monad-instances
+    -Wnoncanonical-monadfail-instances -Wpartial-fields -Wredundant-constraints
+  exposed-modules:
+    UntypedExpr, UntypedLambdaCalc, UntypedLambdaCalcDeBruijn
