@@ -7,6 +7,7 @@ data Token
   | TokenHepGar
   | TokenPal
   | TokenPar
+  | TokenSem
   | TokenVar [Char]
   | TokenUnit
   | TokenBool

@@ -6,6 +6,7 @@ import Stlc.Token
 import Stlc.Type
 
 import Bound
+import Control.Monad.Trans
 }
 
 %name parse
@@ -16,33 +17,36 @@ import Bound
   '\\'  { TokenBas    }
   ':'   { TokenCol    }
   '.'   { TokenDot    }
+  '->'  { TokenHepGar }
   '('   { TokenPal    }
   ')'   { TokenPar    }
-  '->'  { TokenHepGar }
+  ';'   { TokenSem    }
   var   { TokenVar $$ }
   unit  { TokenBool   }
   bool  { TokenBool   }
   true  { TokenTrue   }
   false { TokenFalse  }
 
-%right '->'
+%right '->' ';'
+%right '.'
 
 -- Here we list all of the tokens that may begin a Term. The associativity is
 -- not important - we only wish to give them less precedence than the
 -- pseudo-token APP. This resolves 'f x y' to '(f x) y'.
-%nonassoc '\\' var
+%nonassoc '\\' '(' var unit true false
 %nonassoc APP
 
 %%
 
 Term
-  : var                        { TermVar $1                   }
-  | '\\' var ':' Type '.' Term { TermLam $4 (abstract1 $2 $6) }
-  | Term Term %prec APP        { TermApp $1 $2                }
-  | unit                       { TermUnit                     }
-  | true                       { TermTrue                     }
-  | false                      { TermFalse                    }
-  | '(' Term ')'               { $2                           }
+  : var                        { TermVar $1                              }
+  | '\\' var ':' Type '.' Term { TermLam $4 (abstract1 $2 $6)            }
+  | Term Term %prec APP        { TermApp $1 $2                           }
+  | unit                       { TermUnit                                }
+  | true                       { TermTrue                                }
+  | false                      { TermFalse                               }
+  | Term ';' Term              { TermApp (TermLam TypeUnit (lift $3)) $1 }
+  | '(' Term ')'               { $2                                      }
 
 Type
   : bool           { TypeBool      }

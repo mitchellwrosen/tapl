@@ -27,6 +27,7 @@ a-z+  { \s -> TokenVar s  }
 \.    { \_ -> TokenDot    }
 \(    { \_ -> TokenPal    }
 \)    { \_ -> TokenPar    }
+\;    { \_ -> TokenSem    }
 
 {
 
