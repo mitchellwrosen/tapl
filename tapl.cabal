@@ -4,8 +4,10 @@ version: 0
 
 library
   build-depends:
-      base ^>= 4.11
+      array
+    , base ^>= 4.11
     , bound ^>= 2.0
+    , bytestring
     , containers ^>= 0.5
     , Earley ^>= 0.12
     , lexer-applicative ^>= 2.1.0.2
@@ -15,7 +17,11 @@ library
     , prettyprinter ^>= 1.2
     , regex-applicative ^>= 0.3
     , srcloc ^>= 0.5
+    , text
     , transformers-compat ^>= 0.6
+  build-tools:
+      alex
+    , happy
   default-extensions:
     DeriveFunctor, DeriveGeneric, DeriveTraversable, LambdaCase,
     OverloadedStrings, PatternSynonyms, RecursiveDo, ScopedTypeVariables,
@@ -28,10 +34,21 @@ library
     , UntypedLambdaCalcDeBruijn
     , TypedExpr
     , SimplyTypedLambdaCalc
-    , SimplyTypedLambdaCalcExtensions
+    , Stlc.Alex
+    , Stlc.Eval
+    , Stlc.Happy
+    , Stlc.Lexer
+    , Stlc.Parser
+    , Stlc.Pretty
+    , Stlc.Term
+    , Stlc.Token
+    , Stlc.Type
+    , Stlc.TypeCheck
   ghc-options:
     -fprint-expanded-synonyms -fprint-explicit-foralls -fprint-explicit-kinds
     -fprint-unicode-syntax -freverse-errors -Wall -Wcompat -Widentities
     -Wincomplete-record-updates -Wincomplete-uni-patterns
-    -Wmissing-local-signatures -Wnoncanonical-monad-instances
+    -Wnoncanonical-monad-instances
     -Wnoncanonical-monadfail-instances -Wpartial-fields -Wredundant-constraints
+  hs-source-dirs:
+    .
