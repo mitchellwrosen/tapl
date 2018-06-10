@@ -6,6 +6,7 @@ library
   build-depends:
       base ^>= 4.11
     , containers ^>= 0.5
+    , Earley ^>= 0.12
     , lexer-applicative ^>= 2.1.0.2
     , megaparsec ^>= 6.5.0
     , mtl ^>= 2.2
@@ -13,8 +14,8 @@ library
     , regex-applicative ^>= 0.3
     , srcloc >= 0.5
   default-extensions:
-    LambdaCase, OverloadedStrings, PatternSynonyms, ScopedTypeVariables,
-    ViewPatterns
+    LambdaCase, OverloadedStrings, PatternSynonyms, RecursiveDo,
+    ScopedTypeVariables, ViewPatterns
   default-language:
     Haskell2010
   exposed-modules:
@@ -22,9 +23,10 @@ library
     , UntypedLambdaCalc
     , UntypedLambdaCalcDeBruijn
     , TypedExpr
+    , SimplyTypedLambdaCalc
   ghc-options:
     -fprint-expanded-synonyms -fprint-explicit-foralls -fprint-explicit-kinds
     -fprint-unicode-syntax -freverse-errors -Wall -Wcompat -Widentities
-    -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists
+    -Wincomplete-record-updates -Wincomplete-uni-patterns
     -Wmissing-local-signatures -Wnoncanonical-monad-instances
     -Wnoncanonical-monadfail-instances -Wpartial-fields -Wredundant-constraints

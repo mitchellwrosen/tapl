@@ -1,6 +1,5 @@
 module UntypedLambdaCalc where
 
-import Data.Semigroup
 import Data.Set (Set)
 import Text.Megaparsec
 import Text.Megaparsec.Char
