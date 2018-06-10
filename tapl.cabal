@@ -5,6 +5,7 @@ version: 0
 library
   build-depends:
       base ^>= 4.11
+    , bound ^>= 2.0
     , containers ^>= 0.5
     , Earley ^>= 0.12
     , lexer-applicative ^>= 2.1.0.2
@@ -12,10 +13,12 @@ library
     , mtl ^>= 2.2
     , parsec ^>= 3.1
     , regex-applicative ^>= 0.3
-    , srcloc >= 0.5
+    , srcloc ^>= 0.5
+    , transformers-compat ^>= 0.6
   default-extensions:
-    LambdaCase, OverloadedStrings, PatternSynonyms, RecursiveDo,
-    ScopedTypeVariables, ViewPatterns
+    DeriveFunctor, DeriveGeneric, DeriveTraversable, LambdaCase,
+    OverloadedStrings, PatternSynonyms, RecursiveDo, ScopedTypeVariables,
+    ViewPatterns
   default-language:
     Haskell2010
   exposed-modules:
@@ -24,6 +27,7 @@ library
     , UntypedLambdaCalcDeBruijn
     , TypedExpr
     , SimplyTypedLambdaCalc
+    , SimplyTypedLambdaCalcExtensions
   ghc-options:
     -fprint-expanded-synonyms -fprint-explicit-foralls -fprint-explicit-kinds
     -fprint-unicode-syntax -freverse-errors -Wall -Wcompat -Widentities
