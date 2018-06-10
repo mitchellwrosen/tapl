@@ -1,8 +1,10 @@
 module SimplyTypedLambdaCalcExtensions where
 
 import Bound
+import Control.Applicative hiding (some)
 import Control.Monad
 import Control.Monad.Trans
+import Data.Bifunctor
 import Data.Foldable (asum)
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
@@ -10,6 +12,9 @@ import Data.Void
 import GHC.Generics (Generic1)
 import Text.Megaparsec
 import Text.Megaparsec.Char
+
+import qualified Data.Text.Prettyprint.Doc as Ppr
+import qualified Data.Text.Prettyprint.Doc.Render.Text as Ppr
 
 --------------------------------------------------------------------------------
 -- Term
@@ -22,6 +27,7 @@ data Term a
   | TermTrue
   | TermFalse
   | TermIf (Term a) (Term a) (Term a)
+  | TermUnit
   deriving (Foldable, Functor, Generic1, Show, Traversable)
 
 instance Applicative Term where
@@ -36,6 +42,7 @@ instance Monad Term where
   TermTrue >>= _ = TermTrue
   TermFalse >>= _ = TermFalse
   TermIf t1 t2 t3 >>= f = TermIf (t1 >>= f) (t2 >>= f) (t3 >>= f)
+  TermUnit >>= _ = TermUnit
 
 instance Show1 Term where
   liftShowsPrec = liftShowsPrecDefault
@@ -46,7 +53,13 @@ pattern Value t <- (matchValue -> Just t)
 matchValue :: Term a -> Maybe (Term a)
 matchValue = \case
   t@TermLam{} -> Just t
-  _ -> Nothing
+  TermTrue -> Just TermTrue
+  TermFalse -> Just TermFalse
+  TermUnit -> Just TermUnit
+
+  TermVar{} -> Nothing
+  TermApp{} -> Nothing
+  TermIf{} -> Nothing
 
 --------------------------------------------------------------------------------
 -- Type
@@ -55,14 +68,8 @@ matchValue = \case
 data Type
   = TypeFun Type Type
   | TypeBool
+  | TypeUnit
   deriving (Eq, Show)
-
---------------------------------------------------------------------------------
--- Context
---------------------------------------------------------------------------------
-
-type Context a
-  = [(a, Type)]
 
 --------------------------------------------------------------------------------
 -- Type checking
@@ -75,7 +82,7 @@ typeOf =
 typeOf' :: Term Type -> Maybe Type
 typeOf' = \case
   TermVar x ->
-    Just x
+    pure x
   TermLam y t -> do
     r <- typeOf' (instantiate1 (TermVar y) t)
     pure (TypeFun y r)
@@ -94,6 +101,8 @@ typeOf' = \case
     y3 <- typeOf' t3
     guard (y2 == y3)
     pure y2
+  TermUnit ->
+    pure TypeUnit
 
 --------------------------------------------------------------------------------
 -- Evaluation
@@ -119,18 +128,16 @@ eval1 = \case
     Just t
   TermIf t1 t2 t3 ->
     TermIf <$> eval1 t1 <*> pure t2 <*> pure t3
-  TermLam{} ->
-    Nothing
-  TermVar{} ->
-    Nothing
-  TermTrue ->
-    Nothing
-  TermFalse ->
-    Nothing
 
-evalString :: [Char] -> Either (ParseError Char ()) (Maybe (Term Void))
+  TermLam{} -> Nothing
+  TermVar{} -> Nothing
+  TermTrue -> Nothing
+  TermFalse -> Nothing
+  TermUnit -> Nothing
+
+evalString :: [Char] -> Either String (Maybe (Term Void))
 evalString =
-  fmap f . parseTerm
+  bimap parseErrorPretty f . parseTerm
  where
   f :: Term [Char] -> Maybe (Term Void)
   f t = do
@@ -143,34 +150,71 @@ evalString =
 --------------------------------------------------------------------------------
 
 type Parser a
-  = Parsec () [Char] a
+  = Parsec Void [Char] a
 
-parseTerm :: [Char] -> Either (ParseError Char ()) (Term [Char])
+parseTerm :: [Char] -> Either (ParseError Char Void) (Term [Char])
 parseTerm s =
   runParser termParser "" s
 
+
+-- term
+--   = true term'
+--   | false term'
+--   | unit term'
+--   | ( term ) term'
+--   | \ var : type . term term'
+--   | var term'
+--
+-- term'
+--   = term term'
+--   | ; term term'
+--   | empty
 termParser :: Parser (Term [Char])
 termParser =
-  foldl1 TermApp <$> some (lambdaParser <|> varParser <|> parens termParser)
+  foldl1 TermApp <$>
+    some
+      (asum
+        [ (TermTrue <$ lexeme (string "true")) <**> tailParser
+        , (TermFalse <$ lexeme (string "false")) <**> tailParser
+        , (TermUnit <$ lexeme (string "unit")) <**> tailParser
+        , (TermVar <$> lexeme (some lowerChar)) <**> tailParser
+        , lambdaParser <**> tailParser
+        , parens termParser <**> tailParser
+        ])
  where
+  tailParser :: Parser (Term [Char] -> Term [Char])
+  tailParser =
+    asum
+      [ do
+          _ <- lexeme (char ';')
+          x <- termParser
+          f <- tailParser
+          pure (\t -> f (TermApp (TermLam TypeUnit (lift x)) t))
+      , do
+          x <- termParser
+          f <- tailParser
+          pure
+            (\t ->
+              case x of
+                TermApp v1 v2 -> f (TermApp (TermApp t v1) v2)
+                _ -> f (TermApp t x))
+      , pure id
+      ]
+
   lambdaParser :: Parser (Term [Char])
   lambdaParser = do
-    _ <- char '\\' <* space
-    v <- some lowerChar <* space
-    _ <- char ':' <* space
+    _ <- lexeme (char '\\')
+    v <- lexeme (some lowerChar)
+    _ <- lexeme (char ':')
     y <- typeParser
-    _ <- char '.' <* space
+    _ <- lexeme (char '.')
     t <- termParser
     pure (TermLam y (abstract1 v t))
-
-  varParser :: Parser (Term [Char])
-  varParser =
-    TermVar <$> some lowerChar <* space
 
 typeParser :: Parser Type
 typeParser = do
   ty1 <- atomParser
-  optional (string "->" *> space) >>= \case
+  optional (lexeme (string "->")) >>= \case
     Nothing ->
       pure ty1
     Just _ -> do
@@ -179,10 +223,44 @@ typeParser = do
   atomParser :: Parser Type
   atomParser =
     asum
-      [ TypeBool <$ string "bool" <* space
+      [ TypeBool <$ lexeme (string "bool")
+      , TypeUnit <$ lexeme (string "unit")
       , parens typeParser
       ]
 
 parens :: Parser a -> Parser a
 parens p =
-  char '(' *> p <* char ')' <* space
+  lexeme (char '(' *> p <* char ')')
+
+lexeme :: Parser a -> Parser a
+lexeme =
+  (<* space)
+
+--------------------------------------------------------------------------------
+-- Pretty-printing
+--------------------------------------------------------------------------------
+
+-- Horrible pretty-printing functions for debugging. They don't work properly.
+
+putTerm :: Term [Char] -> IO ()
+putTerm =
+  Ppr.putDoc . pprTerm
+
+pprTerm :: Term [Char] -> Ppr.Doc ()
+pprTerm = \case
+  TermVar s -> Ppr.pretty s
+  TermLam y t ->
+    "(\\_ : " <> pprType y <> ". " <> pprTerm (instantiate1 (TermVar "x") t)
+      <> ")"
+  TermApp t1 t2 -> pprTerm t1 <> Ppr.space <> pprTerm t2
+  TermTrue -> "true"
+  TermFalse -> "false"
+  TermIf t1 t2 t3 ->
+    "if " <> pprTerm t1 <> " then " <> pprTerm t2 <> " else " <> pprTerm t3
+  TermUnit -> "unit"
+
+pprType :: Type -> Ppr.Doc ()
+pprType = \case
+  TypeBool -> "bool"
+  TypeUnit -> "unit"
+  TypeFun t1 t2 -> pprType t1 <> " -> " <> pprType t2
