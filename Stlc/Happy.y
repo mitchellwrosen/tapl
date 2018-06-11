@@ -1,6 +1,7 @@
 {
 module Stlc.Happy where
 
+import Stlc.Label
 import Stlc.Term
 import Stlc.Token
 import Stlc.Type
@@ -44,6 +45,7 @@ import Control.Monad.Trans
 
 %%
 
+Term :: { Term [Char] }
 Term
   : var                        { TermVar $1                              }
   | '\\' var ':' Type '.' Term { TermLam $4 (abstract1 $2 $6)            }
@@ -51,7 +53,8 @@ Term
   | Term ';' Term              { TermApp (TermLam TypeUnit (lift $3)) $1 }
   | Term as Type               { TermAs $1 $3                            }
   | '{' '}'                    { TermTuple []                            }
-  | '{' Terms '}'              { TermTuple (reverse $2)                  }
+  | '{' Tuple '}'              { TermTuple (reverse $2)                  }
+  | '{' Record '}'             { TermRecord (reverse $2)                 }
   | Term '.' int               { TermTupleIx $1 $3                       }
   | let var '=' Term in Term   { TermLet $4 (abstract1 $2 $6)            }
   | '(' Term ')'               { $2                                      }
@@ -59,10 +62,17 @@ Term
   | true                       { TermTrue                                }
   | false                      { TermFalse                               }
 
-Terms
+Tuple :: { [Term [Char]] }
+Tuple
   : Term           { [$1] }
-  | Terms ',' Term { $3 : $1 }
+  | Tuple ',' Term { $3 : $1 }
 
+Record :: { [(Label, Term [Char])] }
+Record
+  : var '=' Term            { [($1, $3)] }
+  | Record ',' var '=' Term { ($3, $5) : $1 }
+
+Type :: { Type }
 Type
   : bool           { TypeBool      }
   | unit           { TypeUnit      }

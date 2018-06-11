@@ -25,6 +25,8 @@ pprTerm = \case
   TermAs t y -> pprTerm t <> " as " <> pprType y
   TermTuple{} -> undefined
   TermTupleIx{} -> undefined
+  TermRecord{} -> undefined
+  TermRecordIx{} -> undefined
   TermUnit -> "unit"
   TermTrue -> "true"
   TermFalse -> "false"
@@ -35,5 +37,6 @@ pprType :: Type -> Ppr.Doc ()
 pprType = \case
   TypeFun t1 t2 -> pprType t1 <> " -> " <> pprType t2
   TypeTuple{} -> undefined
+  TypeRecord{} -> undefined
   TypeBool -> "bool"
   TypeUnit -> "unit"

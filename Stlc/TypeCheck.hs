@@ -5,6 +5,7 @@ import Stlc.Type
 
 import Bound
 import Control.Monad
+import Data.List (nub)
 import Data.Void
 
 typeOf :: Term Void -> Maybe Type
@@ -36,6 +37,13 @@ typeOf' = \case
     TypeTuple ys <- typeOf' t
     guard (i > 0 && i <= length ys)
     pure (ys !! (i-1))
+  TermRecord ts -> do
+    ys <- traverse (typeOf' . snd) ts
+    guard (length (nub (map fst ts)) == length ts)
+    pure (TypeRecord (zipWith ((,) . fst) ts ys))
+  TermRecordIx t l -> do
+    TypeRecord ys <- typeOf' t
+    lookup l ys
   TermUnit ->
     pure TypeUnit
   TermTrue ->

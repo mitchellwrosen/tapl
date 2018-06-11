@@ -5,6 +5,7 @@ import Stlc.Term
 import Stlc.TypeCheck (typeOf)
 
 import Bound
+import Data.Maybe
 import Data.Void
 
 import qualified Data.ByteString.Char8 as Latin1
@@ -39,6 +40,14 @@ eval1 = \case
     Just (ts !! (i-1))
   TermTupleIx t i ->
     TermTupleIx <$> eval1 t <*> pure i
+  TermRecord ts -> do
+    (xs, (l,t):ys) <- pure (span (isValue . snd) ts)
+    v <- eval1 t
+    pure (TermRecord (xs ++ [(l,v)] ++ ys))
+  TermRecordIx (Value (TermRecord ts)) l ->
+    Just (fromJust (lookup l ts))
+  TermRecordIx t l ->
+    TermRecordIx <$> eval1 t <*> pure l
   TermIf TermTrue t _ ->
     Just t
   TermIf TermFalse _ t ->

@@ -1,10 +1,12 @@
 module Stlc.Term where
 
+import Stlc.Label
 import Stlc.Type
 
 import Bound
 import Control.Monad
 import Control.Monad.Trans
+import Data.Bifunctor
 import Data.Foldable
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
@@ -18,6 +20,8 @@ data Term a
   | TermAs (Term a) Type
   | TermTuple [Term a]
   | TermTupleIx (Term a) Int
+  | TermRecord [(Label, Term a)]
+  | TermRecordIx (Term a) Label
   | TermUnit
   | TermTrue
   | TermFalse
@@ -37,6 +41,8 @@ instance Monad Term where
   TermAs t y >>= f = TermAs (t >>= f) y
   TermTuple ts >>= f = TermTuple (map (>>= f) ts)
   TermTupleIx t i >>= f = TermTupleIx (t >>= f) i
+  TermRecord ts >>= f = TermRecord ((map.second) (>>= f) ts)
+  TermRecordIx t l >>= f = TermRecordIx (t >>= f) l
   TermUnit >>= _ = TermUnit
   TermTrue >>= _ = TermTrue
   TermFalse >>= _ = TermFalse
@@ -52,6 +58,7 @@ matchValue :: Term a -> Maybe (Term a)
 matchValue = \case
   t@TermLam{} -> Just t
   t@(TermTuple ts) -> t <$ traverse_ matchValue ts
+  t@(TermRecord ts) -> t <$ traverse_ (matchValue . snd) ts
   TermUnit -> Just TermUnit
   TermTrue -> Just TermTrue
   TermFalse -> Just TermFalse
@@ -61,6 +68,7 @@ matchValue = \case
   TermLet{} -> Nothing
   TermAs{} -> Nothing
   TermTupleIx{} -> Nothing
+  TermRecordIx{} -> Nothing
   TermIf{} -> Nothing
 
 isValue :: Term a -> Bool
