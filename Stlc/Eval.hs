@@ -23,6 +23,8 @@ eval1 = \case
     TermApp v1 <$> eval1 t2
   TermApp t1 t2 ->
     TermApp <$> eval1 t1 <*> pure t2
+  TermAs (Value t) _ ->
+    Just t
   TermIf TermTrue t _ ->
     Just t
   TermIf TermFalse _ t ->
@@ -32,9 +34,10 @@ eval1 = \case
 
   TermLam{} -> Nothing
   TermVar{} -> Nothing
+  TermAs{} -> Nothing
+  TermUnit -> Nothing
   TermTrue -> Nothing
   TermFalse -> Nothing
-  TermUnit -> Nothing
 
 evalString :: [Char] -> Maybe (Term Void)
 evalString =

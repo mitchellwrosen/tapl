@@ -21,20 +21,19 @@ import Control.Monad.Trans
   '('   { TokenPal    }
   ')'   { TokenPar    }
   ';'   { TokenSem    }
-  var   { TokenVar $$ }
-  unit  { TokenBool   }
+  as    { TokenAs     }
   bool  { TokenBool   }
-  true  { TokenTrue   }
   false { TokenFalse  }
+  true  { TokenTrue   }
+  unit  { TokenBool   }
+  var   { TokenVar $$ }
 
 %right '->' ';'
 %right '.'
 
--- Here we list all of the tokens that may begin a Term. The associativity is
--- not important - we only wish to give them less precedence than the
--- pseudo-token APP. This resolves 'f x y' to '(f x) y'.
 %nonassoc '\\' '(' var unit true false
 %nonassoc APP
+%nonassoc as
 
 %%
 
@@ -42,11 +41,12 @@ Term
   : var                        { TermVar $1                              }
   | '\\' var ':' Type '.' Term { TermLam $4 (abstract1 $2 $6)            }
   | Term Term %prec APP        { TermApp $1 $2                           }
+  | Term ';' Term              { TermApp (TermLam TypeUnit (lift $3)) $1 }
+  | Term as Type               { TermAs $1 $3                            }
+  | '(' Term ')'               { $2                                      }
   | unit                       { TermUnit                                }
   | true                       { TermTrue                                }
   | false                      { TermFalse                               }
-  | Term ';' Term              { TermApp (TermLam TypeUnit (lift $3)) $1 }
-  | '(' Term ')'               { $2                                      }
 
 Type
   : bool           { TypeBool      }

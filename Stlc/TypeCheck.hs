@@ -23,6 +23,12 @@ typeOf' = \case
     z <- typeOf' t2
     guard (y1 == z)
     pure y2
+  TermAs t y -> do
+    z <- typeOf' t
+    guard (y == z)
+    pure y
+  TermUnit ->
+    pure TypeUnit
   TermTrue ->
     pure TypeBool
   TermFalse ->
@@ -33,7 +39,3 @@ typeOf' = \case
     y3 <- typeOf' t3
     guard (y2 == y3)
     pure y2
-  TermUnit ->
-    pure TypeUnit
-
-

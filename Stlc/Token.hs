@@ -1,16 +1,17 @@
 module Stlc.Token where
 
 data Token
-  = TokenBas
+  = TokenAs
+  | TokenBas
+  | TokenBool
   | TokenCol
   | TokenDot
+  | TokenFalse
   | TokenHepGar
   | TokenPal
   | TokenPar
   | TokenSem
-  | TokenVar [Char]
-  | TokenUnit
-  | TokenBool
   | TokenTrue
-  | TokenFalse
+  | TokenUnit
+  | TokenVar [Char]
   deriving Show

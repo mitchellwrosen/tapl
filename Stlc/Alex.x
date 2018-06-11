@@ -15,10 +15,12 @@ import qualified Data.ByteString as ByteString
 
 $white+ ;
 
-unit  { \_ -> TokenUnit   }
+as    { \_ -> TokenAs     }
 bool  { \_ -> TokenBool   }
-true  { \_ -> TokenTrue   }
 false { \_ -> TokenFalse  }
+true  { \_ -> TokenTrue   }
+unit  { \_ -> TokenUnit   }
+
 a-z+  { \s -> TokenVar s  }
 
 \- >  { \_ -> TokenHepGar }

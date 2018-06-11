@@ -21,11 +21,12 @@ pprTerm = \case
     "(\\_ : " <> pprType y <> ". " <> pprTerm (instantiate1 (TermVar "x") t)
       <> ")"
   TermApp t1 t2 -> pprTerm t1 <> Ppr.space <> pprTerm t2
+  TermAs t y -> pprTerm t <> " as " <> pprType y
+  TermUnit -> "unit"
   TermTrue -> "true"
   TermFalse -> "false"
   TermIf t1 t2 t3 ->
     "if " <> pprTerm t1 <> " then " <> pprTerm t2 <> " else " <> pprTerm t3
-  TermUnit -> "unit"
 
 pprType :: Type -> Ppr.Doc ()
 pprType = \case
