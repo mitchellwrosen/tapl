@@ -5,6 +5,7 @@ import Stlc.Type
 import Bound
 import Control.Monad
 import Control.Monad.Trans
+import Data.Foldable
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
 import GHC.Generics (Generic1)
@@ -15,6 +16,8 @@ data Term a
   | TermApp (Term a) (Term a)
   | TermLet (Term a) (Scope () Term a)
   | TermAs (Term a) Type
+  | TermTuple [Term a]
+  | TermTupleIx (Term a) Int
   | TermUnit
   | TermTrue
   | TermFalse
@@ -32,6 +35,8 @@ instance Monad Term where
   TermApp x y >>= f = TermApp (x >>= f) (y >>= f)
   TermLet t s >>= f = TermLet (t >>= f) (s >>= lift . f)
   TermAs t y >>= f = TermAs (t >>= f) y
+  TermTuple ts >>= f = TermTuple (map (>>= f) ts)
+  TermTupleIx t i >>= f = TermTupleIx (t >>= f) i
   TermUnit >>= _ = TermUnit
   TermTrue >>= _ = TermTrue
   TermFalse >>= _ = TermFalse
@@ -46,6 +51,7 @@ pattern Value t <- (matchValue -> Just t)
 matchValue :: Term a -> Maybe (Term a)
 matchValue = \case
   t@TermLam{} -> Just t
+  t@(TermTuple ts) -> t <$ traverse_ matchValue ts
   TermUnit -> Just TermUnit
   TermTrue -> Just TermTrue
   TermFalse -> Just TermFalse
@@ -54,4 +60,10 @@ matchValue = \case
   TermApp{} -> Nothing
   TermLet{} -> Nothing
   TermAs{} -> Nothing
+  TermTupleIx{} -> Nothing
   TermIf{} -> Nothing
+
+isValue :: Term a -> Bool
+isValue = \case
+  Value{} -> True
+  _ -> False

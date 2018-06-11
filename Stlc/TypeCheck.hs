@@ -30,6 +30,12 @@ typeOf' = \case
     z <- typeOf' t
     guard (y == z)
     pure y
+  TermTuple ts ->
+    TypeTuple <$> traverse typeOf' ts
+  TermTupleIx t i -> do
+    TypeTuple ys <- typeOf' t
+    guard (i > 0 && i <= length ys)
+    pure (ys !! (i-1))
   TermUnit ->
     pure TypeUnit
   TermTrue ->

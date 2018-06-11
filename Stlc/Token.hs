@@ -5,10 +5,14 @@ data Token
   | TokenBas
   | TokenBool
   | TokenCol
+  | TokenCom
   | TokenDot
   | TokenFalse
   | TokenHepGar
   | TokenIn
+  | TokenInt Int
+  | TokenKel
+  | TokenKer
   | TokenLet
   | TokenPal
   | TokenPar

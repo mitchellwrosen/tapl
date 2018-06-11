@@ -23,6 +23,8 @@ pprTerm = \case
   TermApp t1 t2 -> pprTerm t1 <> Ppr.space <> pprTerm t2
   TermLet{} -> undefined
   TermAs t y -> pprTerm t <> " as " <> pprType y
+  TermTuple{} -> undefined
+  TermTupleIx{} -> undefined
   TermUnit -> "unit"
   TermTrue -> "true"
   TermFalse -> "false"
@@ -31,7 +33,7 @@ pprTerm = \case
 
 pprType :: Type -> Ppr.Doc ()
 pprType = \case
+  TypeFun t1 t2 -> pprType t1 <> " -> " <> pprType t2
+  TypeTuple{} -> undefined
   TypeBool -> "bool"
   TypeUnit -> "unit"
-  TypeFun t1 t2 -> pprType t1 <> " -> " <> pprType t2
-

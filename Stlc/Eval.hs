@@ -29,6 +29,16 @@ eval1 = \case
     TermLet <$> eval1 t <*> pure s
   TermAs (Value t) _ ->
     Just t
+  TermAs t y ->
+    TermAs <$> eval1 t <*> pure y
+  TermTuple ts -> do
+    (xs, t:ys) <- pure (span isValue ts)
+    v <- eval1 t
+    pure (TermTuple (xs ++ [v] ++ ys))
+  TermTupleIx (Value (TermTuple ts)) i ->
+    Just (ts !! (i-1))
+  TermTupleIx t i ->
+    TermTupleIx <$> eval1 t <*> pure i
   TermIf TermTrue t _ ->
     Just t
   TermIf TermFalse _ t ->
@@ -38,7 +48,6 @@ eval1 = \case
 
   TermVar{} -> Nothing
   TermLam{} -> Nothing
-  TermAs{} -> Nothing
   TermUnit -> Nothing
   TermTrue -> Nothing
   TermFalse -> Nothing

@@ -16,8 +16,11 @@ import Control.Monad.Trans
 %token
   '\\'  { TokenBas    }
   ':'   { TokenCol    }
+  ','   { TokenCom    }
   '.'   { TokenDot    }
   '->'  { TokenHepGar }
+  '{'   { TokenKel    }
+  '}'   { TokenKer    }
   '('   { TokenPal    }
   ')'   { TokenPar    }
   ';'   { TokenSem    }
@@ -30,12 +33,13 @@ import Control.Monad.Trans
   true  { TokenTrue   }
   unit  { TokenBool   }
   var   { TokenVar $$ }
+  int   { TokenInt $$ }
 
 %right '->' ';'
 %right '.'
 %right in
 
-%nonassoc '\\' '(' as let false true unit var
+%nonassoc '\\' '(' '{' as let false true unit var
 %nonassoc APP
 
 %%
@@ -46,11 +50,18 @@ Term
   | Term Term %prec APP        { TermApp $1 $2                           }
   | Term ';' Term              { TermApp (TermLam TypeUnit (lift $3)) $1 }
   | Term as Type               { TermAs $1 $3                            }
+  | '{' '}'                    { TermTuple []                            }
+  | '{' Terms '}'              { TermTuple (reverse $2)                  }
+  | Term '.' int               { TermTupleIx $1 $3                       }
   | let var '=' Term in Term   { TermLet $4 (abstract1 $2 $6)            }
   | '(' Term ')'               { $2                                      }
   | unit                       { TermUnit                                }
   | true                       { TermTrue                                }
   | false                      { TermFalse                               }
+
+Terms
+  : Term           { [$1] }
+  | Terms ',' Term { $3 : $1 }
 
 Type
   : bool           { TypeBool      }
@@ -61,3 +72,5 @@ Type
 parseError :: [Token] -> a
 parseError = error . show
 }
+
+
