@@ -21,19 +21,22 @@ import Control.Monad.Trans
   '('   { TokenPal    }
   ')'   { TokenPar    }
   ';'   { TokenSem    }
+  '='   { TokenTis    }
   as    { TokenAs     }
   bool  { TokenBool   }
   false { TokenFalse  }
+  in    { TokenIn     }
+  let   { TokenLet    }
   true  { TokenTrue   }
   unit  { TokenBool   }
   var   { TokenVar $$ }
 
 %right '->' ';'
 %right '.'
+%right in
 
-%nonassoc '\\' '(' var unit true false
+%nonassoc '\\' '(' as let false true unit var
 %nonassoc APP
-%nonassoc as
 
 %%
 
@@ -43,6 +46,7 @@ Term
   | Term Term %prec APP        { TermApp $1 $2                           }
   | Term ';' Term              { TermApp (TermLam TypeUnit (lift $3)) $1 }
   | Term as Type               { TermAs $1 $3                            }
+  | let var '=' Term in Term   { TermLet $4 (abstract1 $2 $6)            }
   | '(' Term ')'               { $2                                      }
   | unit                       { TermUnit                                }
   | true                       { TermTrue                                }

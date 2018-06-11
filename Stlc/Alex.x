@@ -18,6 +18,8 @@ $white+ ;
 as    { \_ -> TokenAs     }
 bool  { \_ -> TokenBool   }
 false { \_ -> TokenFalse  }
+in    { \_ -> TokenIn     }
+let   { \_ -> TokenLet    }
 true  { \_ -> TokenTrue   }
 unit  { \_ -> TokenUnit   }
 
@@ -30,6 +32,7 @@ a-z+  { \s -> TokenVar s  }
 \(    { \_ -> TokenPal    }
 \)    { \_ -> TokenPar    }
 \;    { \_ -> TokenSem    }
+=     { \_ -> TokenTis    }
 
 {
 

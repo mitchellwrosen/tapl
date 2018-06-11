@@ -23,6 +23,9 @@ typeOf' = \case
     z <- typeOf' t2
     guard (y1 == z)
     pure y2
+  TermLet t s -> do
+    y <- typeOf' t
+    typeOf' (instantiate1 (TermVar y) s)
   TermAs t y -> do
     z <- typeOf' t
     guard (y == z)

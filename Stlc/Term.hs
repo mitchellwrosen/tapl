@@ -13,6 +13,7 @@ data Term a
   = TermVar a
   | TermLam Type (Scope () Term a)
   | TermApp (Term a) (Term a)
+  | TermLet (Term a) (Scope () Term a)
   | TermAs (Term a) Type
   | TermUnit
   | TermTrue
@@ -29,6 +30,7 @@ instance Monad Term where
   TermVar x >>= f = f x
   TermLam y x >>= f = TermLam y (x >>= lift . f)
   TermApp x y >>= f = TermApp (x >>= f) (y >>= f)
+  TermLet t s >>= f = TermLet (t >>= f) (s >>= lift . f)
   TermAs t y >>= f = TermAs (t >>= f) y
   TermUnit >>= _ = TermUnit
   TermTrue >>= _ = TermTrue
@@ -50,5 +52,6 @@ matchValue = \case
 
   TermVar{} -> Nothing
   TermApp{} -> Nothing
+  TermLet{} -> Nothing
   TermAs{} -> Nothing
   TermIf{} -> Nothing

@@ -23,6 +23,10 @@ eval1 = \case
     TermApp v1 <$> eval1 t2
   TermApp t1 t2 ->
     TermApp <$> eval1 t1 <*> pure t2
+  TermLet (Value t) s ->
+    Just (instantiate1 t s)
+  TermLet t s ->
+    TermLet <$> eval1 t <*> pure s
   TermAs (Value t) _ ->
     Just t
   TermIf TermTrue t _ ->
@@ -32,8 +36,8 @@ eval1 = \case
   TermIf t1 t2 t3 ->
     TermIf <$> eval1 t1 <*> pure t2 <*> pure t3
 
-  TermLam{} -> Nothing
   TermVar{} -> Nothing
+  TermLam{} -> Nothing
   TermAs{} -> Nothing
   TermUnit -> Nothing
   TermTrue -> Nothing

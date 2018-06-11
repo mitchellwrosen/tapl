@@ -8,9 +8,12 @@ data Token
   | TokenDot
   | TokenFalse
   | TokenHepGar
+  | TokenIn
+  | TokenLet
   | TokenPal
   | TokenPar
   | TokenSem
+  | TokenTis
   | TokenTrue
   | TokenUnit
   | TokenVar [Char]

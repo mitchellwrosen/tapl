@@ -21,6 +21,7 @@ pprTerm = \case
     "(\\_ : " <> pprType y <> ". " <> pprTerm (instantiate1 (TermVar "x") t)
       <> ")"
   TermApp t1 t2 -> pprTerm t1 <> Ppr.space <> pprTerm t2
+  TermLet{} -> undefined
   TermAs t y -> pprTerm t <> " as " <> pprType y
   TermUnit -> "unit"
   TermTrue -> "true"
