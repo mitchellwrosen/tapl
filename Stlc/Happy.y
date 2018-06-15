@@ -2,6 +2,8 @@
 module Stlc.Happy where
 
 import Stlc.Label
+import Stlc.Lexer (Parser)
+import {-# SOURCE #-} Stlc.Parser
 import Stlc.Term
 import Stlc.Token
 import Stlc.Type
@@ -10,8 +12,10 @@ import Bound
 import Control.Monad.Trans
 }
 
-%name parse
+%name parser
 %tokentype { Token }
+%monad { Parser }
+%lexer { lexer } { TokenEOF }
 %error { parseError }
 
 %token
@@ -19,7 +23,7 @@ import Control.Monad.Trans
   ':'   { TokenCol    }
   ','   { TokenCom    }
   '.'   { TokenDot    }
-  '->'  { TokenHepGar }
+  '->'  { TokenHepgar }
   '{'   { TokenKel    }
   '}'   { TokenKer    }
   '('   { TokenPal    }
@@ -77,10 +81,3 @@ Type
   : bool           { TypeBool      }
   | unit           { TypeUnit      }
   | Type '->' Type { TypeFun $1 $3 }
-
-{
-parseError :: [Token] -> a
-parseError = error . show
-}
-
-

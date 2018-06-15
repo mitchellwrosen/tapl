@@ -2,12 +2,7 @@
 
 module Stlc.Alex where
 
-import Stlc.Token
-
-import Data.ByteString (ByteString)
-import Data.Word
-
-import qualified Data.ByteString as ByteString
+import Stlc.Lexer
 
 }
 
@@ -15,36 +10,25 @@ import qualified Data.ByteString as ByteString
 
 $white+ ;
 
-as    { \_ -> TokenAs           }
-bool  { \_ -> TokenBool         }
-false { \_ -> TokenFalse        }
-in    { \_ -> TokenIn           }
-let   { \_ -> TokenLet          }
-true  { \_ -> TokenTrue         }
-unit  { \_ -> TokenUnit         }
+as    { tkAs     }
+bool  { tkBool   }
+false { tkFalse  }
+in    { tkIn     }
+let   { tkLet    }
+true  { tkTrue   }
+unit  { tkUnit   }
 
-a-z+  { \s -> TokenVar s        }
-0-9+  { \s -> TokenInt (read s) }
+a-z+  { tkVar    }
+0-9+  { tkInt    }
 
-\- >  { \_ -> TokenHepGar       }
-\\    { \_ -> TokenBas          }
-:     { \_ -> TokenCol          }
-\,    { \_ -> TokenCom          }
-\.    { \_ -> TokenDot          }
-\{    { \_ -> TokenKel          }
-\}    { \_ -> TokenKer          }
-\(    { \_ -> TokenPal          }
-\)    { \_ -> TokenPar          }
-\;    { \_ -> TokenSem          }
-=     { \_ -> TokenTis          }
-
-{
-
-type AlexInput
-  = ByteString
-
-alexGetByte :: AlexInput -> Maybe (Word8, AlexInput)
-alexGetByte =
-  ByteString.uncons
-
-}
+\\    { tkBas    }
+:     { tkCol    }
+\,    { tkCom    }
+\.    { tkDot    }
+\->   { tkHepgar }
+\{    { tkKel    }
+\}    { tkKer    }
+\(    { tkPal    }
+\)    { tkPar    }
+\;    { tkSem    }
+=     { tkTis    }

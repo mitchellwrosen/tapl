@@ -61,6 +61,7 @@ eval1 = \case
   TermTrue -> Nothing
   TermFalse -> Nothing
 
+{-
 evalString :: [Char] -> Maybe (Term Void)
 evalString =
   f . parseTerm . Latin1.pack
@@ -70,3 +71,4 @@ evalString =
     t' <- closed t
     _ <- typeOf t'
     pure (eval t')
+-}

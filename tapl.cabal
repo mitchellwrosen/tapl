@@ -18,14 +18,28 @@ library
     , regex-applicative ^>= 0.3
     , srcloc ^>= 0.5
     , text
+    , transformers
     , transformers-compat ^>= 0.6
   build-tools:
       alex
     , happy
   default-extensions:
-    DeriveFunctor, DeriveGeneric, DeriveTraversable, LambdaCase,
-    OverloadedStrings, PatternSynonyms, RecursiveDo, ScopedTypeVariables,
-    TupleSections, TypeApplications, ViewPatterns
+    DeriveFunctor
+    DeriveGeneric
+    DeriveTraversable
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    OverloadedStrings
+    PatternSynonyms
+    RecursiveDo
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeApplications
+    TypeSynonymInstances
+    ViewPatterns
   default-language:
     Haskell2010
   exposed-modules:

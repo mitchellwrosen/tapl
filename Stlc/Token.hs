@@ -8,7 +8,7 @@ data Token
   | TokenCom
   | TokenDot
   | TokenFalse
-  | TokenHepGar
+  | TokenHepgar
   | TokenIn
   | TokenInt Int
   | TokenKel
@@ -21,4 +21,5 @@ data Token
   | TokenTrue
   | TokenUnit
   | TokenVar [Char]
+  | TokenEOF
   deriving Show
