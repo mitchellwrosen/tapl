@@ -6,6 +6,7 @@ import Stlc.TypeCheck (typeOf)
 
 import Bound
 import Data.Maybe
+import Data.Foldable (toList)
 import Data.Void
 
 import qualified Data.ByteString.Char8 as Latin1
@@ -48,6 +49,12 @@ eval1 = \case
     Just (fromJust (lookup l ts))
   TermRecordIx t l ->
     TermRecordIx <$> eval1 t <*> pure l
+  TermVariant l t y ->
+    TermVariant <$> pure l <*> eval1 t <*> pure y
+  TermCase (TermVariant l (Value t) _) us ->
+    Just (instantiate1 t (fromJust (lookup l (toList us))))
+  TermCase t us ->
+    TermCase <$> eval1 t <*> pure us
   TermIf TermTrue t _ ->
     Just t
   TermIf TermFalse _ t ->

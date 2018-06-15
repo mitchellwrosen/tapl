@@ -5,11 +5,11 @@ import Stlc.Type
 
 import Bound
 import Control.Monad
-import Control.Monad.Trans
 import Data.Bifunctor
 import Data.Foldable
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
+import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic1)
 
 data Term a
@@ -22,6 +22,8 @@ data Term a
   | TermTupleIx (Term a) Int
   | TermRecord [(Label, Term a)]
   | TermRecordIx (Term a) Label
+  | TermVariant Label (Term a) Type
+  | TermCase (Term a) (NonEmpty (Label, Scope () Term a))
   | TermUnit
   | TermTrue
   | TermFalse
@@ -35,14 +37,16 @@ instance Applicative Term where
 instance Monad Term where
   return = pure
   TermVar x >>= f = f x
-  TermLam y x >>= f = TermLam y (x >>= lift . f)
+  TermLam y x >>= f = TermLam y (x >>>= f)
   TermApp x y >>= f = TermApp (x >>= f) (y >>= f)
-  TermLet t s >>= f = TermLet (t >>= f) (s >>= lift . f)
+  TermLet t s >>= f = TermLet (t >>= f) (s >>>= f)
   TermAs t y >>= f = TermAs (t >>= f) y
   TermTuple ts >>= f = TermTuple (map (>>= f) ts)
   TermTupleIx t i >>= f = TermTupleIx (t >>= f) i
   TermRecord ts >>= f = TermRecord ((map.second) (>>= f) ts)
   TermRecordIx t l >>= f = TermRecordIx (t >>= f) l
+  TermVariant l t y >>= f = TermVariant l (t >>= f) y
+  TermCase t us >>= f = TermCase (t >>= f) ((fmap.second) (>>>= f) us)
   TermUnit >>= _ = TermUnit
   TermTrue >>= _ = TermTrue
   TermFalse >>= _ = TermFalse
@@ -59,6 +63,7 @@ matchValue = \case
   t@TermLam{} -> Just t
   t@(TermTuple ts) -> t <$ traverse_ matchValue ts
   t@(TermRecord ts) -> t <$ traverse_ (matchValue . snd) ts
+  t@(TermVariant _ v _) -> t <$ matchValue v
   TermUnit -> Just TermUnit
   TermTrue -> Just TermTrue
   TermFalse -> Just TermFalse
@@ -69,6 +74,7 @@ matchValue = \case
   TermAs{} -> Nothing
   TermTupleIx{} -> Nothing
   TermRecordIx{} -> Nothing
+  TermCase{} -> Nothing
   TermIf{} -> Nothing
 
 isValue :: Term a -> Bool

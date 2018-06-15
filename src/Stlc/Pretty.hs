@@ -27,6 +27,8 @@ pprTerm = \case
   TermTupleIx{} -> undefined
   TermRecord{} -> undefined
   TermRecordIx{} -> undefined
+  TermVariant{} -> undefined
+  TermCase{} -> undefined
   TermUnit -> "unit"
   TermTrue -> "true"
   TermFalse -> "false"
@@ -38,5 +40,6 @@ pprType = \case
   TypeFun t1 t2 -> pprType t1 <> " -> " <> pprType t2
   TypeTuple{} -> undefined
   TypeRecord{} -> undefined
+  TypeVariant{} -> undefined
   TypeBool -> "bool"
   TypeUnit -> "unit"

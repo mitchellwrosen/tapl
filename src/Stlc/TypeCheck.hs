@@ -5,7 +5,9 @@ import Stlc.Type
 
 import Bound
 import Control.Monad
+import Data.Foldable (for_, toList)
 import Data.List (nub)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Void
 
 typeOf :: Term Void -> Maybe Type
@@ -44,6 +46,23 @@ typeOf' = \case
   TermRecordIx t l -> do
     TypeRecord ys <- typeOf' t
     lookup l ys
+  TermVariant l t y -> do
+    x <- typeOf' t
+    TypeVariant zs <- pure y
+    z <- lookup l (toList zs)
+    guard (x == z)
+    pure y
+  TermCase t ((l1, u1) :| us) -> do
+    TypeVariant (toList -> ys) <- typeOf' t
+    y1 <- lookup l1 ys
+    z1 <- typeOf' (instantiate1 (TermVar y1) u1)
+    for_ us $ \(l, u) -> do
+      y <- lookup l ys
+      z <- typeOf' (instantiate1 (TermVar y) u)
+      guard (z == z1)
+    for_ ys $ \(l, _) ->
+      guard (l `elem` l1 : map fst us)
+    pure z1
   TermUnit ->
     pure TypeUnit
   TermTrue ->

@@ -66,4 +66,4 @@ library
     -Wnoncanonical-monad-instances
     -Wnoncanonical-monadfail-instances -Wpartial-fields -Wredundant-constraints
   hs-source-dirs:
-    .
+    src

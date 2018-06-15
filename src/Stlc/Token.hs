@@ -4,20 +4,25 @@ data Token
   = TokenAs
   | TokenBas
   | TokenBool
+  | TokenCase
   | TokenCol
   | TokenCom
   | TokenDot
   | TokenFalse
+  | TokenGal
+  | TokenGar
   | TokenHepgar
   | TokenIn
   | TokenInt Int
   | TokenKel
   | TokenKer
   | TokenLet
+  | TokenOf
   | TokenPal
   | TokenPar
   | TokenSem
   | TokenTis
+  | TokenTisgar
   | TokenTrue
   | TokenUnit
   | TokenVar [Char]
