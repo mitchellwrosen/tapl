@@ -41,6 +41,7 @@ import qualified Data.List.NonEmpty as List1
   bool  { TokenBool   }
   case  { TokenCase   }
   false { TokenFalse  }
+  fix   { TokenFix    }
   in    { TokenIn     }
   let   { TokenLet    }
   of    { TokenOf     }
@@ -55,6 +56,7 @@ import qualified Data.List.NonEmpty as List1
 
 %nonassoc '\\' '(' '{' '<' as case let false true unit var
 %nonassoc ALT APP
+%nonassoc fix
 
 %%
 
@@ -63,6 +65,7 @@ Term
   : var                          { TermVar $1                                }
   | '\\' var ':' Type '.' Term   { TermLam $4 (abstract1 $2 $6)              }
   | Term Term %prec APP          { TermApp $1 $2                             }
+  | fix Term                     { TermFix $2                                }
   | Term ';' Term                { TermApp (TermLam TypeUnit (lift $3)) $1   }
   | Term as Type                 { TermAs $1 $3                              }
   | '{' '}'                      { TermTuple []                              }

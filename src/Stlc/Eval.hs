@@ -25,6 +25,10 @@ eval1 = \case
     TermApp v1 <$> eval1 t2
   TermApp t1 t2 ->
     TermApp <$> eval1 t1 <*> pure t2
+  TermFix t@(TermLam _ s) ->
+    Just (instantiate1 t s)
+  TermFix t ->
+    TermFix <$> eval1 t
   TermLet (Value t) s ->
     Just (instantiate1 t s)
   TermLet t s ->

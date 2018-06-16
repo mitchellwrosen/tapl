@@ -9,6 +9,7 @@ data Token
   | TokenCom
   | TokenDot
   | TokenFalse
+  | TokenFix
   | TokenGal
   | TokenGar
   | TokenHepgar

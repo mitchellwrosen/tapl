@@ -17,6 +17,7 @@ data Term a
   | TermLam Type (Scope () Term a)
   | TermApp (Term a) (Term a)
   | TermLet (Term a) (Scope () Term a)
+  | TermFix (Term a)
   | TermAs (Term a) Type
   | TermTuple [Term a]
   | TermTupleIx (Term a) Int
@@ -39,6 +40,7 @@ instance Monad Term where
   TermVar x >>= f = f x
   TermLam y x >>= f = TermLam y (x >>>= f)
   TermApp x y >>= f = TermApp (x >>= f) (y >>= f)
+  TermFix t >>= f = TermFix (t >>= f)
   TermLet t s >>= f = TermLet (t >>= f) (s >>>= f)
   TermAs t y >>= f = TermAs (t >>= f) y
   TermTuple ts >>= f = TermTuple (map (>>= f) ts)
@@ -70,6 +72,7 @@ matchValue = \case
 
   TermVar{} -> Nothing
   TermApp{} -> Nothing
+  TermFix{} -> Nothing
   TermLet{} -> Nothing
   TermAs{} -> Nothing
   TermTupleIx{} -> Nothing

@@ -14,6 +14,7 @@ as    { tkAs     }
 bool  { tkBool   }
 case  { tkCase   }
 false { tkFalse  }
+fix   { tkFix    }
 in    { tkIn     }
 let   { tkLet    }
 of    { tkOf     }

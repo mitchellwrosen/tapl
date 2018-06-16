@@ -34,6 +34,7 @@ tkCol    = tk  TokenCol
 tkCom    = tk  TokenCom
 tkDot    = tk  TokenDot
 tkFalse  = tk  TokenFalse
+tkFix    = tk  TokenFix
 tkGal    = tk  TokenGal
 tkGar    = tk  TokenGar
 tkHepgar = tk  TokenHepgar

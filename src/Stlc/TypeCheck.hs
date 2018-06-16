@@ -26,6 +26,10 @@ typeOf' = \case
     z <- typeOf' t2
     guard (y1 == z)
     pure y2
+  TermFix t -> do
+    TypeFun u v <- typeOf' t
+    guard (u == v)
+    pure u
   TermLet t s -> do
     y <- typeOf' t
     typeOf' (instantiate1 (TermVar y) s)

@@ -16,9 +16,9 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Latin1
 
 parseError :: Token -> Parser a
-parseError tk = do
+parseError t = do
   (bytes, code) <- get
-  throwError (ParseError bytes code tk)
+  throwError (ParseError bytes code t)
 
 parseTerm :: ByteString -> Either E (Term [Char])
 parseTerm bytes =

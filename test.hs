@@ -13,7 +13,9 @@ import System.Exit
 main :: IO ()
 main = do
   let input =
-        -- "case t of { <bar = y> => true; <foo = x> => false; }"
+        "fix (\\x:bool->bool. \\y:bool. y) true"
+
+        {-
         "let \
         \  t = <foo=true> as <foo:bool, bar:unit> \
         \in \
@@ -21,6 +23,7 @@ main = do
         \    <foo = x> => x;\
         \    <bar = y> => true;\
         \  }"
+        -- -}
 
   putStrLn "-- PARSE --"
   term <-
